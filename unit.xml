@@ -288,9 +288,7 @@
       <unitEvents>
         <unitEvent name="PUBLIC.VISIT_CALL">
           <unitEventHandler type="GROOVY"><![CDATA[
-						
-						
-				import qmatic.qp.jiql.core.util.CommonUtil
+			    import qmatic.qp.jiql.core.util.CommonUtil
 				import com.qmatic.qp.api.connectors.dto.BranchVariable
 				import com.qmatic.qp.api.connectors.dto.TinyVisit
 				import groovy.json.JsonSlurper
@@ -325,7 +323,7 @@
 				visitId = event.getParameter("visitId")
     			queueId = event.getParameter("queueId")
 				serviceId = event.getParameter("serviceOrigId")
-
+				smsTemplateId = unit.getConfiguration().get("smsTemplateId") 
 				branchId = event.getParameter("branchId")
 				ticketCallStatus = device.getState("ticketCallStatus")
 				params = event.getParameters()
@@ -555,7 +553,7 @@
 		smsReq.setLanguagePref(""+langPreference);
 		smsReq.setMobileNumber(phoneNumber);
 		smsReq.setSendAsChannel(properties.getProperty("sendAsChannel"));
-		smsReq.setSmsTemplateID(properties.getProperty("smsTemplateID"));
+		smsReq.setSmsTemplateID(smsTemplateId);
 		smsReq.setSmsTextValues(smsText);
 		smsReq.setTransactionType(properties.getProperty("transactionType"));
 
