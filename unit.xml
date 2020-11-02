@@ -48,7 +48,7 @@
 
 -->
 
-<unit type="DISPLAY_POINT" name="ADCP_SMS_Events" defaultNoUnits="1" maxNoUnits="1" unitVersion="V2.5.4.27" frameworkVersion="2"
+<unit type="DISPLAY_POINT" name="ADCP_SMS_Events" defaultNoUnits="1" maxNoUnits="1" unitVersion="V2.5.4.32" frameworkVersion="2"
       description="Unit to send sms for the waiting customers">
 
     <helpText>
@@ -288,12 +288,7 @@
       <unitEvents>
         <unitEvent name="PUBLIC.VISIT_CALL">
           <unitEventHandler type="GROOVY"><![CDATA[
-						
-	            import com.qmatic.qp.api.device.DeviceEvent
-				import com.qmatic.qp.api.connectors.device.ServicePointDeviceResource
-				import com.qmatic.qp.api.connectors.device.IdentificationDeviceResource
-				import com.qmatic.qp.api.connectors.device.BranchDeviceResource
-				import com.qmatic.qp.jiql.core.util.CommonUtil
+			    import qmatic.qp.jiql.core.util.CommonUtil
 				import com.qmatic.qp.api.connectors.dto.BranchVariable
 				import com.qmatic.qp.api.connectors.dto.TinyVisit
 				import groovy.json.JsonSlurper
@@ -328,13 +323,12 @@
 				visitId = event.getParameter("visitId")
     			queueId = event.getParameter("queueId")
 				serviceId = event.getParameter("serviceOrigId")
-
+				smsTemplateId = unit.getConfiguration().get("smsTemplateId") 
 				branchId = event.getParameter("branchId")
 				ticketCallStatus = device.getState("ticketCallStatus")
 				params = event.getParameters()
 								
-				configFilePath=unit.getConfiguration().get("configFilePath")
-				smsTemplateId=unit.getConfiguration().get("smsTemplateId")
+				configFilePath=unit.getConfiguration().get("configFilePath")	
 				prefferedLangAr=unit.getConfiguration().get("prefferedLangAr")	
 				prefferedLangEn=unit.getConfiguration().get("prefferedLangEn")	
 				smsText=unit.getConfiguration().get("smsText")				
@@ -486,7 +480,6 @@
 							newEvent.setParameter("queueTicket",ticket)
 							newEvent.setParameter("langPref",visit.getParameter("langPref"))
 							def langPreference=0
-						
 							
 							if(prefferedLangEn==visit.getParameter("langPref")){
 								langPreference=0;
@@ -494,7 +487,7 @@
 							langPreference=1;
 							}
 							
-							smsText=smsText.replace("ticket",ticket);
+							smsText=smsText.replace("{ticket}",visit.getTicketId());
 							t = event.getParameter("callTime")
 							refIdStartDat=refIdStartDat.replace("L","");
 							
@@ -508,6 +501,7 @@
 								device.log("INFO","SMS Text:"+smsText)
 								device.log("INFO","configFilePath:"+configFilePath)
 								device.log("INFO","ref Id:"+refId)
+								device.log("INFO","ticket id 2:"+ticket)
 									}
 								
 		WSProperties wsProperties = WSProperties.getInstance();
