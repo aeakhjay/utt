@@ -302,7 +302,6 @@
 				import java.util.Map;
 				import java.util.Properties;
 				import java.util.logging.Logger;
-
 				import com.adcb.esb.common.header.HeaderType;
 				import com.adcb.esb.mnt.noncard.addsendsmsemail.SMSServiceReq;
 				import com.adcb.esb.mnt.noncard.addsendsmsemail.SRSMSServiceReqMsg;
