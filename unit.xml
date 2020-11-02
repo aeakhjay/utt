@@ -1,0 +1,698 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+<!--
+    
+    All modifications to this unit type must be added here!
+
+    The version number of the unit type template (utt) has the format X.Y.n, for example 2.3.0, where:
+    -   X stands for the “utt framework version” – this digit should not be updated!
+    -   Y stands for the version of the current utt, from Qmatic – this digit should not be updated!
+    -   n is the serial number that should be updated as soon as the utt has been adapted/customised to better suit your needs.
+
+      
+    Version history in descending order:
+    ====================================
+    Version    Date         Comments                                  Signature
+    ==========  ============ 	===============================================================  =========
+	5.3.1.002				annbol	Added support for entering 0 as position to notify. This means, the SMS will be sent to the ticket 
+									that has just been called (current ticket).
+
+	5.3.1.004				annbol	Added support for sending a reminder if a ticket is created with a delay (Specific for 1 customer)
+									The reminder is sent a configurable time before the ticket is actually created (after the given delay)
+
+  	5.3.1.005				annbol	Removed wrong logging "No Alerts defined", was always printed if debugging was switched on
+									Changed the parameter on the event for the returnTime from serviceExtName to returnTime.
+
+	5.3.2.006  20150508		boudui  Added logic to store Queue - Service relation in branch var      
+									Prevent log messages to be added when debug is unchecked
+									
+	5.3.2.007  20150611		annbol	Added ARRIVAL_ALERT. Alert is being sent when ticket is created and setting is enabled.
+
+    5.3.2.008				annbol	Sending SLA alert for every ticket if waiting time over SLA, new option in SLA type 
+	
+	5.3.2.010  20150810		annbol	Sending Arrival alert on transfer too. Not sending ticket call alert again when recalling ticket
+	
+	5.3.2.011  20150905     annbol  Fixes for recalling ticket
+	
+	5.3.2.012  20151013     annbol  Added VISIT_END event
+	
+	5.3.2.013  20160216     annbol  Added CUSTOM_LOW_PAPER event
+	5.3.2.014  20161024		vibval	Added waitingQueue
+	5.3.2.016  20161024  	vibval  Added queueTicket as 
+	5.3.2.017  20161103		vibval	Added currentServing, langPref
+	5.3.2.018  20161107  	vibval	Added langPref for visit call event
+	5.4.1	   20170212		vibval	Disabled service queue relation in visit_call
+	5.4.1	   20170212		vibval	Disabled service queue relation in visit_call
+	2.5.4.11   20200622		Akhil	ADCB SMS API Integration
+	    ====================================================================================================================
+
+-->
+
+<unit type="DISPLAY_POINT" name="ADCP_SMS_Events" defaultNoUnits="1" maxNoUnits="1" unitVersion="V2.5.4.27" frameworkVersion="2"
+      description="Unit to send sms for the waiting customers">
+
+    <helpText>
+        This is a help text
+    </helpText>
+
+    <parameters>
+        <parameter name="unitId"
+                   type="UnitId"
+                   defaultValue="alertsUnit"
+                   label="Unit id"
+                   description="Unique id of the unit"
+                   sortOrder="1"
+                   writeLevel="profile"
+                   readLevel="branch"
+                   privilege="install:adminAdmin"
+                   size="16"/>
+
+		<parameter name="unitName" 
+                    type="UnitName" 
+                    defaultValue="${unit:name} ${unit:index}"
+                    label="Unit name"/>
+
+		<parameter name="phoneNumberField"
+				type="String"
+				defaultValue="phoneNumber"
+				mandatory="true"
+				label="Phone number field"
+				description = "Specify Customer:field if property is on the customer"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="configFilePath"
+				type="String"
+				defaultValue="D://..../adcbsms.properties"
+				mandatory="true"
+				label="config file path"
+				description = "directory location of the cofig properties file"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="prefferedLangEn"
+				type="String"
+				defaultValue="en"
+				mandatory="true"
+				label="Prefered lag Eng value"
+				description = "provide prefered lang value returing from webservice"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="smsTemplateId"
+				type="String"
+				defaultValue="0"
+				mandatory="true"
+				label="SMS Template ID"
+				description = "provide SMS Template ID"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		
+		<parameter name="prefferedLangAr"
+				type="String"
+				defaultValue="ar"
+				mandatory="true"
+				label="Prefered lag Ar value"
+				description = "provide prefered lang value returing from webservice"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="smsText"
+				type="String"
+				defaultValue="{ticket}"
+				mandatory="true"
+				label="SMS Text"
+				description = "SMS Text format"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="refIdStartDat"
+				type="String"
+				defaultValue="1592735929L"
+				mandatory="true"
+				label="epoch Start day"
+				description = "refrence id is the difference between current time millis and start time"
+				writeLevel="profile"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="positionToNotify"
+				type="Integer"
+				mandatory="true"
+				defaultValue="5"
+				label = "Position to be notified"
+				description = "Position in the queue to send an SMS"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendTicketCreateEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Ticket Create Events"
+				description = "Switch on/off ticket create events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendTicketEndEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Ticket End Events"
+				description = "Switch on/off ticket end events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendTicketCreateReminderEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Ticket Create Reminder Events"
+				description = "Switch on/off ticket create reminder events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendTicketReminderOffset"
+				type="Integer"
+				mandatory="true"
+				defaultValue="10"
+				label = "Offset for Ticket Create Reminder event"
+				description = "Time in minutes before the delay time is elapsed to send the reminder"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendTicketCallEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Ticket Call Events"
+				description = "Switch on/off ticket call events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendCustomEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Custom Events"
+				description = "Switch on/off custom events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendCustomEventsPerTicket"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Custom Events for every ticket"
+				description = "Switch on/off whether custom events should be send for every ticket when SLA is exceeded"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<parameter name="sendArrivalEvents"
+				type="Boolean"
+                defaultValue="true"
+				mandatory="true"
+				label = "Enable Arrival Events"
+				description = "Switch on/off arrival events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		<!--<parameter name="sendArrivalEventsType"
+				type="Options"
+                defaultValue="1"
+				isMultiSelect="false"
+				label = "Enable Arrival Events on"
+				description = "Define when the arrival event should be triggered"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin">
+			<options>
+				<option label="Create only">arrivalCreate</option>
+				<option label="Transfer only">arrivalTransfer</option>
+				<option label="Create and Transfer">arrivalBoth</option>
+			</options>
+		</parameter>-->
+		<parameter name="refresh"
+				type="Integer"
+				mandatory="true"
+				defaultValue="30"
+				label = "Custom Events Time Interval (sec)"
+				description = "Time Interval in seconds for checking for custom events"
+				writeLevel="branch"
+				readLevel="branch"
+				privilege="install:adminAdmin"
+		/>
+		
+		<parameter name="logData"
+          sortOrder="990"
+          label="Write data in QAgent log (debug)"
+          description="Note that this may make the log file grow! Use with caution!"
+          defaultValue="false"
+          type="Boolean"
+          writeLevel="profile"
+		  readLevel="branch"
+		  privilege="install:adminAdmin"
+		  />
+
+		
+    </parameters>
+
+    <devices>
+        <device id="1" name="WebPresentationPoint" type="SW_MEDIA_HD_DISPLAY_POINT" resources="EVENT_SCHEDULER,SERVICE_POINT,IDENTIFICATION,BRANCH">
+            <parameters>
+			
+                <parameter name="refreshInterval" type="Integer" description="The number of seconds between refreshes">30</parameter>
+            
+            </parameters>
+			
+			
+        </device>		
+    </devices>
+
+      <unitEvents>
+        <unitEvent name="PUBLIC.VISIT_CALL">
+          <unitEventHandler type="GROOVY"><![CDATA[
+						
+	            import com.qmatic.qp.api.device.DeviceEvent
+				import com.qmatic.qp.api.connectors.device.ServicePointDeviceResource
+				import com.qmatic.qp.api.connectors.device.IdentificationDeviceResource
+				import com.qmatic.qp.api.connectors.device.BranchDeviceResource
+				import com.qmatic.qp.jiql.core.util.CommonUtil
+				import com.qmatic.qp.api.connectors.dto.BranchVariable
+				import com.qmatic.qp.api.connectors.dto.TinyVisit
+				import groovy.json.JsonSlurper
+				import groovy.json.JsonOutput
+				import java.util.LinkedHashMap;
+				import java.io.IOException;
+				import java.text.DateFormat;
+				import java.text.SimpleDateFormat;
+				import java.util.Date;
+				import java.util.HashMap;
+				import java.util.Map;
+				import java.util.Properties;
+				import java.util.logging.Logger;
+
+				import com.adcb.esb.common.header.HeaderType;
+				import com.adcb.esb.mnt.noncard.addsendsmsemail.SMSServiceReq;
+				import com.adcb.esb.mnt.noncard.addsendsmsemail.SRSMSServiceReqMsg;
+				import com.adcb.esb.mnt.noncard.addsendsmsemail.SRSMSServiceResMsg;
+				import com.adcb.qmatic.sms.util.WSProperties;
+				import com.example.xmlns._1242549484905.AddSendSMSEmail;
+				import com.example.xmlns._1242549484905.AddSendSMSEmailPortType;
+           
+
+				sendTicketCallEvents = unit.getConfiguration().get("sendTicketCallEvents")
+				sendTicketEndEvents = unit.getConfiguration().get("sendTicketEndEvents")
+				Boolean logData =unit.getConfiguration().get("logData")
+				device = unit.getDevice("WebPresentationPoint")							
+				IdentificationDeviceResource idResource = device.getResource("IDENTIFICATION")
+				ServicePointDeviceResource spResource = device.getResource("SERVICE_POINT")
+				BranchDeviceResource branchResource = device.getResource("BRANCH")
+				ticket = event.getParameter("ticket")
+				visitId = event.getParameter("visitId")
+    			queueId = event.getParameter("queueId")
+				serviceId = event.getParameter("serviceOrigId")
+
+				branchId = event.getParameter("branchId")
+				ticketCallStatus = device.getState("ticketCallStatus")
+				params = event.getParameters()
+								
+				configFilePath=unit.getConfiguration().get("configFilePath")
+				smsTemplateId=unit.getConfiguration().get("smsTemplateId")
+				prefferedLangAr=unit.getConfiguration().get("prefferedLangAr")	
+				prefferedLangEn=unit.getConfiguration().get("prefferedLangEn")	
+				smsText=unit.getConfiguration().get("smsText")				
+				String refIdStartDat=unit.getConfiguration().get("refIdStartDat")
+				// Save the phone number on the current visit in the state, to be able to retrieve it later when the visit is ended
+				if (sendTicketEndEvents){
+					phoneField = unit.getConfiguration().get("phoneNumberField")	
+						
+					customerId = params.get("customerIds")		
+					
+					def phoneNumber	=""					
+					if (phoneField.contains("CUSTOMER:")){
+						if (logData)
+							device.log("INFO","Getting phone number from customer")
+						customerId = params.get("customerIds")	
+						field = phoneField.minus("CUSTOMER:")							
+						if (customerId == null){
+							if (logData)
+								device.log("INFO", "No Customer related")
+						}
+						else {
+							try{
+								customer = resource.getCustomer(customerId.toInteger())																		
+								phoneNumber = customer.getProperty(field)
+							} catch(e){
+								device.log("ERROR",e.getMessage())
+								
+							}
+							if (phoneNumber == null && logData)
+								device.log("WARN", "Customer doesn't have phone number")
+						}
+					}
+					else {
+						field = phoneField
+						if (logData)
+							device.log("INFO","Getting phone number from ticket")							
+						phoneNumber = params.get(field)
+						if (phoneNumber == null && logData)
+							device.log("INFO", "Ticket doesn't have phone number related")
+
+					}
+					if (logData)
+						device.log("INFO","PhoneNumber = "+phoneNumber)				
+					ticketPhoneRels = device.getState("ticketPhoneRels")
+					if (ticketPhoneRels == null)
+						ticketPhoneRels = "";					
+					def object
+					if (ticketPhoneRels.length() > 0){
+						def jsonSlurper = new JsonSlurper()
+						object = jsonSlurper.parseText(ticketPhoneRels)
+					}
+					else{ 	
+						object = new LinkedHashMap()
+					}
+					LinkedHashMap visitObj = new LinkedHashMap()
+					visitObj.put("phoneNumber",phoneNumber)
+					visitObj.put("queueId",queueId)
+					visitObj.put("serviceId",serviceId)
+					if (object.containsKey(visitId.toString())){
+						object.remove(visitId.toString())
+					}
+					
+					object.put(visitId,visitObj)
+					newTicketPhoneRels = JsonOutput.toJson(object)		
+					device.setState("ticketPhoneRels",newTicketPhoneRels);
+				}
+				
+				if (ticketCallStatus == null)
+					ticketCallStatus = ""
+				
+				boolean recalled = false;
+				if (sendTicketCallEvents)
+				{				
+					newEventName = "VISIT_CALL_ALERT"
+					    																										
+					Integer queueLogicId = CommonUtil.getUnitLogicId(event.getParameter("queueId"))					
+					visits = spResource.getVisitsInQueue(unit.getBranchId(), queueLogicId)					
+					visit = null
+
+					position = unit.getConfiguration().get("positionToNotify")					
+					if (position != 0){
+                      
+                      if (position > visits.size()){
+						if (logData)
+                          device.log("INFO","No visit at position " + position)
+					  }
+                      else{
+						if (logData)
+							device.log("INFO", "Sending event to position:"+position) 
+                          visit = spResource.getVisit(unit.getBranchId(), visits[position-1].getVisitId())						
+                    }
+                    }
+					else {
+						if (logData)
+							device.log("INFO", "Sending event to current ticket")						
+						visit = spResource.getVisit(unit.getBranchId(), event.getParameter("visitId"))
+					}															
+					if (visit != null){						
+						recalled = ticketCallStatus.indexOf(visit.ticketId) >= 0	
+						if (!recalled){
+							phoneField = unit.getConfiguration().get("phoneNumberField")												
+							def phoneNumber	=""					
+							if (phoneField.contains("CUSTOMER")){
+								if (logData)
+									device.log("INFO","Getting phone number from customer")
+								customerId = visit.getCustomerIds()[0]	
+								field = phoneField.minus("CUSTOMER:")       						
+								if (customerId == null){
+									if (logData)
+										device.log("INFO", "No customer related")
+								}
+								else {
+									try{
+										customer = idResource.getCustomer(customerId.toInteger())																		
+										phoneNumber = customer.getProperty(field)									
+									} catch(e){
+										device.log("ERROR",e.getMessage())
+									}
+									if (phoneNumber == null){
+										if (logData)
+											device.log("INFO", "Customer doesn't have phone number")
+									}
+									else {
+										if (logData)
+											device.log("INFO", "Got phone number from customer:" + phoneNumber)
+									}
+								}
+							}
+							else {
+								field = phoneField
+								if (logData)
+									device.log("INFO","Getting phone number from ticket")							
+								phoneNumber = visit.getParameter(field)	
+								if (phoneNumber == null && logData)								
+									device.log("WARN", "Ticket doesn't have phone number related")
+							}
+							if (logData)
+								device.log("INFO","PhoneNumber = "+phoneNumber)
+
+							DeviceEvent newEvent = new DeviceEvent()
+							newEvent.setUnitId(device.getId())
+							newEvent.setEventName(newEventName)
+							newEvent.setEventTime(event.getEventTime())
+							params = event.getParameters()
+							newEvent.setParameters(params)
+							newEvent.setParameter("unitId", event.getUnitId())
+							newEvent.setParameter("phoneNumber", phoneNumber)	
+							newEvent.setParameter("ticket",visit.getTicketId())
+							newEvent.setParameter("queueTicket",ticket)
+							newEvent.setParameter("langPref",visit.getParameter("langPref"))
+							def langPreference=0
+						
+							
+							if(prefferedLangEn==visit.getParameter("langPref")){
+								langPreference=0;
+							}else if(prefferedLangAr==visit.getParameter("langPref")){
+							langPreference=1;
+							}
+							
+							smsText=smsText.replace("ticket",ticket);
+							t = event.getParameter("callTime")
+							refIdStartDat=refIdStartDat.replace("L","");
+							
+							long refIdStart=Long.parseLong(refIdStartDat);
+
+							String refId=System.currentTimeMillis() - refIdStart;
+							if ( t != null && phoneNumber != null && phoneNumber != "") {							
+								try {
+									if (logData){
+								device.log("INFO","LP:"+langPreference)
+								device.log("INFO","SMS Text:"+smsText)
+								device.log("INFO","configFilePath:"+configFilePath)
+								device.log("INFO","ref Id:"+refId)
+									}
+								
+		WSProperties wsProperties = WSProperties.getInstance();
+		wsProperties.setFilePath(configFilePath);
+		Properties properties = null;
+		try {
+			properties = wsProperties.getProperties();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		DateFormat df = new SimpleDateFormat("dd/MM/yy HH:mm:ss");
+		Date dateobj = new Date();
+
+		AddSendSMSEmail addSendSMSEmail = new AddSendSMSEmail();
+		AddSendSMSEmailPortType addSendSMSEmailPortType = addSendSMSEmail.getAddSendSMSEmailPortTypeEndpoint1();
+		// Creating SMS Service Request Message
+		SRSMSServiceReqMsg msg = new SRSMSServiceReqMsg();
+		// Preparing Headers
+		HeaderType headerType = new HeaderType();
+		headerType.setConsumer(properties.getProperty("Consumer"));
+		headerType.setCorrelationID(properties.getProperty("CorrelationID"));
+		headerType.setCredentials(properties.getProperty("Credentials"));
+		// headerType.setErrorDescription();
+		headerType.setErrorDetail(properties.getProperty("CorrelationID"));
+		// headerType.setRepTimeStamp("");
+		headerType.setReqTimeStamp(df.format(dateobj).toString());
+		headerType.setReturnCode(properties.getProperty("CorrelationID"));
+		headerType.setSenderID(properties.getProperty("senderID"));
+		headerType.setServiceAction(properties.getProperty("serviceAction"));
+		headerType.setServiceName(properties.getProperty("serviceName"));
+		headerType.setSysRefNumber(String.valueOf(refId));
+		headerType.setUsecaseID(properties.getProperty("usecaseID"));
+		headerType.setUsername(properties.getProperty("Username"));
+		headerType.setVersionNo(properties.getProperty("versionNo"));
+		msg.setHeader(headerType);
+
+		SMSServiceReq.SMSReq smsReq = new SMSServiceReq.SMSReq();
+
+		smsReq.setAcctNumber(properties.getProperty("acctNumber"));
+		smsReq.setCustomerID(properties.getProperty("CustomerID"));
+		smsReq.setEmailAddress(properties.getProperty("emailAddress"));
+		smsReq.setEmailTemplateID(properties.getProperty("EmailTemplateID"));
+		smsReq.setEmailTextValues(properties.getProperty("emailTextValues"));
+		smsReq.setFlexiFiller1(properties.getProperty("flexiFiller1"));
+		smsReq.setFlexiFiller2(properties.getProperty("flexiFiller2"));
+		smsReq.setFlexiFiller3(properties.getProperty("flexiFiller3"));
+		smsReq.setFlexiFiller4(properties.getProperty("flexiFiller4"));
+		smsReq.setFlexiFiller5(properties.getProperty("flexiFiller5"));
+		smsReq.setLanguagePref(""+langPreference);
+		smsReq.setMobileNumber(phoneNumber);
+		smsReq.setSendAsChannel(properties.getProperty("sendAsChannel"));
+		smsReq.setSmsTemplateID(smsTemplateId);
+		smsReq.setSmsTextValues(smsText);
+		smsReq.setTransactionType(properties.getProperty("transactionType"));
+
+		SMSServiceReq smsServiceReq = new SMSServiceReq();
+		smsServiceReq.getSMSReq().add(smsReq);
+		msg.setSMSServiceReq(smsServiceReq);
+
+		// Posting data
+		Exception exception=null;
+		SRSMSServiceResMsg resMsg = addSendSMSEmailPortType.addSendSMSEmailOper(msg);
+		device.log("INFO","SMS WS Response:"+resMsg.getSMSServiceRes().getSMSRes().get(0).getReason())
+
+
+
+											
+							//result = device.sendEvent( newEvent )
+								} catch(e) {
+									 device.log("ERROR", "error"+e.getMessage())
+	     device.log("ERROR", "error"+e.printStackTrace())
+								}
+							}
+							else{	
+								if (logData)
+									device.log("INFO","We do not send event")							
+							}	
+						}
+						else{
+							if (logData)
+								device.log("INFO","Ticket "+visit.ticketId+" has already been notified")
+						}
+					}
+				}
+				else {
+					if (logData){
+						if (!sendTicketCallEvents)
+							device.log("INFO", "Ticket Call Event disabled")
+						else if (recalled)
+							device.log("INFO", "Ticket Call Event not sent because this is a recall")
+						}
+				}
+				
+				// Now add the just called ticket to the status to prevent sending the alert on RECALL
+				if (!recalled && visit != null){
+					ticketCallStatus += "@"+visit.ticketId
+					device.setState("ticketCallStatus",ticketCallStatus)
+				}
+				
+				// Now remove the just called ticket from the statuses for the WT_TICKET SLA Alerts				
+				try{						
+					noOfAlertsVar = branchResource.getBranchVariable(branchId,"smsNoOfAlerts")																		
+				}
+				catch (e){	    				
+					return
+				}
+				nrAlerts = noOfAlertsVar.getValue().toInteger()	
+				for (i=1;i<=nrAlerts;i++){
+					varName="smsAlert_"+i.toString()
+					try{
+						alertVar = branchResource.getBranchVariable(branchId,varName)
+					}
+					catch (e){
+						device.log("ERROR","Could not read variable "+varName)
+					}
+					value = alertVar.getValue()
+					items = value.split('\\|')
+					status = items[0]
+					newEventName = items[1]
+					if (newEventName == "WT_TICKET_ALERT"){
+						statusName = "WT_TT_ALERT_"+i						
+						ticketStatus = device.getState(statusName)						
+						if (ticketStatus == null)
+							ticketStatus = ""
+						index = ticketStatus.indexOf(ticket)
+						if (index >= 0){
+							if (index+1+ticket.size() <= ticketStatus.size())
+								newTicketStatus = ticketStatus.substring(0,index) + ticketStatus.substring(index+1+ticket.size())
+							else
+								newTicketStatus = ticketStatus.substring(0,index)							
+							device.setState(statusName,newTicketStatus)
+							if (logData)
+								device.log("INFO","Updated Status: "+newTicketStatus)
+						}						
+					}
+				}
+            ]]></unitEventHandler>
+        </unitEvent>
+        
+		 
+		<unitEvent name="RESET">
+			<unitEventHandler type="GROOVY">
+				<![CDATA[
+					import com.qmatic.qp.api.device.DeviceEvent									
+					
+					device = unit.getDevice("WebPresentationPoint")
+					refresh = unit.getConfiguration().get("refresh")
+					
+					DeviceEvent checkAlertEvent = new DeviceEvent(device.getId(), "TIMER_ALERT")
+				
+					timerId = device.getState("TIMER_ALERT")
+					if (timerId != null){
+						device.getResource("EVENT_SCHEDULER").remove(timerId)						
+					}
+  					timerId = device.getResource("EVENT_SCHEDULER").scheduleEvent(refresh, checkAlertEvent)
+					device.setState("TIMER_ALERT",timerId)
+				]]>
+			</unitEventHandler>
+		</unitEvent>
+		
+		
+		
+ 
+		
+		
+		
+		
+	</unitEvents>
+
+
+    <unitCommands>
+        <unitCommand name="VISIT_CALL">
+            <unitCommandHandler type="GROOVY">
+                <![CDATA[
+						import com.qmatic.qp.api.device.DeviceEvent
+						device = unit.getDevice("WebPresentationPoint")
+						DeviceEvent visitCallEvent = new DeviceEvent()
+						visitCallEvent.setUnitId(device.getId())
+						visitCallEvent.setEventName(command.getCommand())
+						params = command.getParameters()
+
+				]]>
+            </unitCommandHandler>
+        </unitCommand>
+    </unitCommands>
+
+
+</unit>
